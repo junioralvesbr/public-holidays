@@ -1,13 +1,30 @@
 import axios from 'axios'
 import './App.css'
 import { useQuery } from '@tanstack/react-query'
-import { useState, type ChangeEvent } from 'react'
-
-const BASEURL = 'https://openholidaysapi.org'
+import { useState } from 'react'
 
 type Country = {
   isoCode: string
   name: [{ text: string }]
+}
+
+type Holiday = {
+  id: string
+  endDate: string
+  name: [{ text: string }]
+}
+
+const BASEURL = 'https://openholidaysapi.org'
+const currentYear = new Date().getFullYear()
+
+const formatdate = (date: string) => {
+  const newDate = new Date(date)
+  const formattedDate = new Intl.DateTimeFormat("en-GB", {
+    day: 'numeric',
+    month: 'long'
+  }).format(newDate)
+
+  return formattedDate
 }
 
 const fetchCountries = async (): Promise<Country[]> => {
@@ -25,14 +42,13 @@ const fetchCountries = async (): Promise<Country[]> => {
   }
 }
 
-const fetchPublicHolidays = async (isoCode: string) => {
-  console.log(isoCode)
+const fetchPublicHolidays = async (isoCode: string): Promise<Holiday[]> => {
   try {
-    const response = await axios.get(`${BASEURL}/PublicHolidays`, {
+    const response = await axios.get<Holiday[]>(`${BASEURL}/PublicHolidays`, {
       params: {
         countryIsoCode: isoCode,
-        validFrom: '2025-01-01',
-        validTo: '205-12-31',
+        validFrom: `${currentYear}-01-01`,
+        validTo: `${currentYear}-12-31`,
         languageIsoCode: 'EN'
       }
     })
@@ -40,12 +56,13 @@ const fetchPublicHolidays = async (isoCode: string) => {
 
   } catch (error) {
     console.log(error)
+    return []
   }
 
 }
 
 function App() {
-  const [isoCode, setIsoCode] = useState('')
+  const [isoCode, setIsoCode] = useState('NL')
 
   // request countries
   const { isSuccess, data: countries, isLoading, isError } = useQuery<Country[]>({
@@ -57,7 +74,7 @@ function App() {
   const {
     data: holidays,
     isFetching
-  } = useQuery({
+  } = useQuery<Holiday[]>({
     queryKey: ['holidays', isoCode],
     queryFn: () => fetchPublicHolidays(isoCode),
     enabled: !!isoCode
@@ -68,11 +85,15 @@ function App() {
   if (isError) return <span>Erro ao buscar a API</span>
 
   return (
-    <div>
+    <main>
       <h1>Public Holidays</h1>
 
       <div>
-        <select name="countries" id="countries" onChange={(event) => setIsoCode(event.target.value)}>
+        <select
+          name="countries"
+          id="countries"
+          defaultValue={isoCode}
+          onChange={(event) => setIsoCode(event.target.value)}>
           {isSuccess && (
             countries?.map((country: Country) => (
               <option
@@ -88,16 +109,19 @@ function App() {
         {isFetching && <span>Loading Holidays...</span>}
 
         <ul>
-          {holidays?.map(holiday => (
-            <li
-              key={holiday.id}
-            >
-              {holiday.name[0].text}
-            </li>
-          ))}
+          {holidays?.map((holiday: Holiday) => {
+            const date = formatdate(holiday.endDate)
+            return (
+              <li
+                key={holiday.id}
+              >
+                {`${date} - ${holiday.name[0].text}`}
+              </li>
+            )
+          })}
         </ul>
       </div>
-    </div >
+    </main>
   )
 }
 
