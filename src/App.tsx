@@ -1,14 +1,13 @@
 import axios from 'axios'
 import './App.css'
 import { useQuery } from '@tanstack/react-query'
+import { useState, type ChangeEvent } from 'react'
 
 const BASEURL = 'https://openholidaysapi.org'
 
 type Country = {
   isoCode: string
-  name: [{
-    text: string
-  }]
+  name: [{ text: string }]
 }
 
 const fetchCountries = async (): Promise<Country[]> => {
@@ -26,11 +25,12 @@ const fetchCountries = async (): Promise<Country[]> => {
   }
 }
 
-const fetchPublicHolidays = async () => {
+const fetchPublicHolidays = async (isoCode: string) => {
+  console.log(isoCode)
   try {
     const response = await axios.get(`${BASEURL}/PublicHolidays`, {
       params: {
-        countryIsoCode: 'BR',
+        countryIsoCode: isoCode,
         validFrom: '2025-01-01',
         validTo: '205-12-31',
         languageIsoCode: 'EN'
@@ -45,6 +45,8 @@ const fetchPublicHolidays = async () => {
 }
 
 function App() {
+  const [isoCode, setIsoCode] = useState('')
+
   // request countries
   const { isSuccess, data: countries, isLoading, isError } = useQuery<Country[]>({
     queryKey: ['countries'],
@@ -52,10 +54,15 @@ function App() {
   })
 
   // request Public Holidays
-  const { data: holidays } = useQuery({
-    queryKey: ['holidays'],
-    queryFn: fetchPublicHolidays
+  const {
+    data: holidays,
+    isFetching
+  } = useQuery({
+    queryKey: ['holidays', isoCode],
+    queryFn: () => fetchPublicHolidays(isoCode),
+    enabled: !!isoCode
   })
+
 
   if (isLoading) return <span>Loading...</span>
   if (isError) return <span>Erro ao buscar a API</span>
@@ -65,20 +72,28 @@ function App() {
       <h1>Public Holidays</h1>
 
       <div>
-        <select name="countries" id="countries" onChange={(event) => console.log(event.target.value)}>
+        <select name="countries" id="countries" onChange={(event) => setIsoCode(event.target.value)}>
           {isSuccess && (
             countries?.map((country: Country) => (
               <option
                 key={country.isoCode}
                 value={country.isoCode}
-              >{country.name[0].text}</option>
+              >
+                {country.name[0].text}
+              </option>
             ))
           )}
         </select>
 
+        {isFetching && <span>Loading Holidays...</span>}
+
         <ul>
-          {holidays.map(holiday => (
-            <li>{holiday.name[0].text}</li>
+          {holidays?.map(holiday => (
+            <li
+              key={holiday.id}
+            >
+              {holiday.name[0].text}
+            </li>
           ))}
         </ul>
       </div>
